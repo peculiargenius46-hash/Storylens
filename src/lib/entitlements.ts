@@ -67,6 +67,25 @@ export async function getAllowance(
   };
 }
 
+/**
+ * Collapses a user's plan to a simple free/paid tier. Used to decide which AI
+ * model chain a job should run on: free users get the low-cost chain, paying
+ * users get the stronger one. Anything that is not the free plan counts as paid.
+ */
+export async function getPlanTier(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<"free" | "paid"> {
+  const { data } = await supabase
+    .from("subscriptions")
+    .select("plan_code")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const planCode = data?.plan_code ?? "free";
+  return planCode === "free" ? "free" : "paid";
+}
+
 /** Adds transcribed seconds to this month's usage row, creating it if needed. */
 export async function recordTranscriptionUsage(
   supabase: SupabaseClient,
@@ -96,5 +115,42 @@ export async function recordTranscriptionUsage(
     user_id: userId,
     billing_period: billingPeriod,
     transcription_seconds: seconds,
+  });
+}
+
+/** Adds model tokens to this month's usage row, creating it if needed. */
+export async function recordAiUsage(
+  supabase: SupabaseClient,
+  userId: string,
+  inputTokens: number,
+  outputTokens: number
+) {
+  if (inputTokens <= 0 && outputTokens <= 0) return;
+
+  const billingPeriod = currentBillingPeriod();
+
+  const { data: existing } = await supabase
+    .from("usage")
+    .select("id, ai_input_tokens, ai_output_tokens")
+    .eq("user_id", userId)
+    .eq("billing_period", billingPeriod)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase
+      .from("usage")
+      .update({
+        ai_input_tokens: (existing.ai_input_tokens ?? 0) + inputTokens,
+        ai_output_tokens: (existing.ai_output_tokens ?? 0) + outputTokens,
+      })
+      .eq("id", existing.id);
+    return;
+  }
+
+  await supabase.from("usage").insert({
+    user_id: userId,
+    billing_period: billingPeriod,
+    ai_input_tokens: inputTokens,
+    ai_output_tokens: outputTokens,
   });
 }
