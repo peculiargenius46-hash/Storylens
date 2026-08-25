@@ -1,108 +1,75 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
-import { getSupabaseConfigurationError } from "@/lib/supabase/config";
+import { createClient } from "@/lib/supabase/server";
 
-export default function SignupPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(getSupabaseConfigurationError());
-  const [checkEmail, setCheckEmail] = useState(false);
+export default async function DashboardPage() {
+  const supabase = await createClient();
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id, title, interviewee, status, created_at")
+    .order("created_at", { ascending: false });
 
-      if (error) {
-        setError(error.message);
-        return;
-      }
-
-      setCheckEmail(true);
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Unable to sign up.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (checkEmail) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
-        <div className="w-full max-w-sm text-center">
-          <h1 className="text-xl font-semibold text-neutral-900">Check your inbox</h1>
-          <p className="mt-2 text-sm text-neutral-600">
-            We&apos;ve sent a confirmation link to {email}. Click it to activate your account.
-          </p>
-        </div>
-      </main>
-    );
-  }
+  const { data: subscription } = await supabase
+    .from("subscriptions")
+    .select("plan_code, status")
+    .eq("user_id", user?.id)
+    .maybeSingle();
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
-        <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Create your account</h1>
-          <p className="mt-1 text-sm text-neutral-600">No card required for a Free account.</p>
+    <main className="min-h-screen bg-neutral-50 px-6 py-10">
+      <div className="mx-auto max-w-3xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-neutral-900">
+              Welcome{user?.email ? `, ${user.email}` : ""}
+            </h1>
+            <p className="mt-1 text-sm text-neutral-600">
+              Plan: {subscription?.plan_code ?? "free"}
+            </p>
+          </div>
+          <form action="/auth/signout" method="post">
+            <button className="text-sm text-neutral-500 underline">Log out</button>
+          </form>
         </div>
 
-        {error && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-        )}
+        <div className="mt-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-neutral-700">Your interviews</h2>
+            <Link
+              href="/new"
+              className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800"
+            >
+              + New Interview
+            </Link>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-neutral-700">Email</label>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-900 focus:outline-none"
-          />
+          {(!projects || projects.length === 0) && (
+            <p className="mt-3 text-sm text-neutral-500">No interviews yet.</p>
+          )}
+
+          {projects && projects.length > 0 && (
+            <ul className="mt-3 divide-y divide-neutral-200 rounded-md border border-neutral-200 bg-white">
+              {projects.map((project) => (
+                <li key={project.id}>
+                  <Link
+                    href={`/projects/${project.id}/upload`}
+                    className="block px-4 py-3 hover:bg-neutral-50"
+                  >
+                    <p className="text-sm font-medium text-neutral-900">{project.title}</p>
+                    <p className="text-xs text-neutral-500">
+                      {project.interviewee ?? "No interviewee set"} — {project.status}
+                    </p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-neutral-700">Password</label>
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-900 focus:outline-none"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
-        >
-          {loading ? "Creating account…" : "Create account"}
-        </button>
-
-        <p className="text-center text-sm text-neutral-600">
-          Already have an account?{" "}
-          <Link href="/login" className="font-medium text-neutral-900 underline">
-            Log in
-          </Link>
-        </p>
-      </form>
+      </div>
     </main>
   );
 }
