@@ -22,25 +22,23 @@ hard-coded anywhere in the app, exactly like section 28 asks for.
 
 ## 2. Set your environment variables
 
-Copy `.env.local.example` to `.env.local` and fill in your real Supabase URL
-and anon key (you already sent me these, they're in the example file).
-`.env.local` is in `.gitignore`, it will never be pushed to GitHub.
+Copy `.env.local.example` to `.env.local` and fill in your Supabase project URL
+and anon/public key. `.env.local` is ignored by Git and must never be committed.
 
 ## 3. Push to GitHub
 
 Same as the YCDI hub: open GitHub Desktop, add this folder as a local
 repository, commit, publish to a new repository on your GitHub account.
 
-## 4. Deploy on Vercel
+## 4. Deploy on Netlify
 
-1. Go to vercel.com, **Add New Project**, import the GitHub repo you just
-   published
-2. Before the first deploy, add the two environment variables from
-   `.env.local` in Vercel's project settings (Environment Variables)
-3. Deploy
+1. Import the GitHub repository into Netlify.
+2. Open **Site configuration → Environment variables**.
+3. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` for every
+   deploy context that should support authentication.
+4. Trigger a new deploy so Next.js can include both public values in the client bundle.
 
-That's it. Vercel rebuilds automatically every time you push a new commit
-from GitHub Desktop, same rhythm as Netlify.
+Netlify rebuilds automatically whenever a new commit is pushed to the configured branch.
 
 ## What to check once it's live
 

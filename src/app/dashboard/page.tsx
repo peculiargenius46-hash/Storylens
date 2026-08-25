@@ -1,7 +1,27 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getSupabaseConfigurationError } from "@/lib/supabase/config";
 
 export default async function DashboardPage() {
+  const configurationError = getSupabaseConfigurationError();
+
+  if (configurationError) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
+        <div className="w-full max-w-md rounded-md border border-neutral-200 bg-white p-6 text-center">
+          <h1 className="text-xl font-semibold text-neutral-900">Dashboard unavailable</h1>
+          <p className="mt-2 text-sm text-neutral-600">{configurationError}</p>
+          <Link
+            href="/login"
+            className="mt-4 inline-block text-sm font-medium text-neutral-900 underline"
+          >
+            Return to login
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   const supabase = await createClient();
 
   const {
