@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseConfigurationError } from "@/lib/supabase/config";
+<<<<<<< HEAD
 import { getAllowance } from "@/lib/entitlements";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -9,6 +10,8 @@ const STATUS_LABELS: Record<string, string> = {
   ready: "Ready",
   archived: "Archived",
 };
+=======
+>>>>>>> 7512eb610f46aad19150c45e2eeb7d925347b96a
 
 export default async function DashboardPage() {
   const configurationError = getSupabaseConfigurationError();

@@ -15,12 +15,17 @@ You only have to do steps 1 and 2 once. After that, deploys are automatic.
 
 ### 1. Run the new database migration
 
+<<<<<<< HEAD
 1. Open your Supabase project.
 2. Left sidebar: **SQL Editor**.
 3. Click **New query**.
 4. Open the file `supabase/migrations/0002_storage.sql` from this project, copy
    everything in it, and paste it into the query box.
 5. Click **Run**.
+=======
+Copy `.env.local.example` to `.env.local` and fill in your Supabase project URL
+and anon/public key. `.env.local` is ignored by Git and must never be committed.
+>>>>>>> 7512eb610f46aad19150c45e2eeb7d925347b96a
 
 You should see "Success. No rows returned." That creates the private `recordings`
 storage bucket, locks it to each user's own folder, and adds a heartbeat column so a
@@ -30,6 +35,7 @@ transcription that stalls can recover itself.
 instead: Supabase sidebar → **Storage** → **New bucket** → name it exactly
 `recordings` → leave **Public bucket** switched OFF → **Save**. Then re-run the file.
 
+<<<<<<< HEAD
 ### 2. Add your AssemblyAI key to Netlify
 
 1. Netlify → your StoryLens site → **Site configuration** (called **Project
@@ -41,6 +47,17 @@ instead: Supabase sidebar → **Storage** → **New bucket** → name it exactly
 
 The key stays on the server. It is never sent to the browser, which is the whole
 reason this app runs on Next.js server routes instead of a static site.
+=======
+## 4. Deploy on Netlify
+
+1. Import the GitHub repository into Netlify.
+2. Open **Site configuration → Environment variables**.
+3. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` for every
+   deploy context that should support authentication.
+4. Trigger a new deploy so Next.js can include both public values in the client bundle.
+
+Netlify rebuilds automatically whenever a new commit is pushed to the configured branch.
+>>>>>>> 7512eb610f46aad19150c45e2eeb7d925347b96a
 
 ### 3. Push the code
 
