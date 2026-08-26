@@ -30,6 +30,10 @@ type Provider = {
   url: string;
   keyEnv: string;
   extraHeaders?: Record<string, string>;
+  // Most providers want the key as `Authorization: Bearer <key>`. A few, like
+  // AssemblyAI, want the raw key with no "Bearer" in front. Set this true for
+  // those. If a raw-auth provider ever returns 401, flip it to false to test.
+  rawAuth?: boolean;
 };
 
 // Every one of these speaks the OpenAI-style /chat/completions request.
@@ -73,6 +77,17 @@ const PROVIDERS: Record<string, Provider> = {
     name: "xai",
     url: "https://api.x.ai/v1/chat/completions",
     keyEnv: "XAI_API_KEY",
+  },
+  // AssemblyAI's LLM Gateway. One OpenAI-compatible endpoint that fronts Claude,
+  // GPT, Gemini and Qwen. It runs on the SAME AssemblyAI key already used for
+  // transcription (ASSEMBLYAI_API_KEY), so no new secret is needed. Reference it
+  // in a chain as `assembly:the-model-id`, e.g. `assembly:qwen3-32B`. The gateway
+  // takes the raw key, so rawAuth is true.
+  assembly: {
+    name: "assembly",
+    url: "https://llm-gateway.assemblyai.com/v1/chat/completions",
+    keyEnv: "ASSEMBLYAI_API_KEY",
+    rawAuth: true,
   },
 };
 
@@ -224,7 +239,7 @@ async function callOnce<T>(
     fetch(provider.url, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${key}`,
+        authorization: provider.rawAuth ? key : `Bearer ${key}`,
         "content-type": "application/json",
         ...(provider.extraHeaders ?? {}),
       },
