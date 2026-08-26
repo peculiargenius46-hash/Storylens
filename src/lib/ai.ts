@@ -188,14 +188,37 @@ export function configuredProviders(): string[] {
 const JSON_MODE_DISABLED = process.env.AI_DISABLE_JSON_MODE === "true";
 
 function errorMessage(body: unknown): string {
-  if (body && typeof body === "object" && "error" in body) {
-    const err = (body as { error: unknown }).error;
-    if (typeof err === "string") return err;
-    if (err && typeof err === "object" && "message" in err) {
-      return String((err as { message: unknown }).message ?? "");
+  if (typeof body === "string") return body;
+
+  if (body && typeof body === "object") {
+    if ("error" in body) {
+      const err = (body as { error: unknown }).error;
+      if (typeof err === "string") return err;
+      if (err && typeof err === "object" && "message" in err) {
+        return String((err as { message: unknown }).message ?? "");
+      }
+    }
+    // Some gateways return the message at the top level, or under `detail`.
+    for (const field of ["message", "detail", "error_message"] as const) {
+      if (field in body) {
+        const value = (body as Record<string, unknown>)[field];
+        if (typeof value === "string" && value) return value;
+      }
     }
   }
+
   return "";
+}
+
+// When a provider's error body is in a shape we don't recognise, show a short
+// slice of the raw response instead of nothing. An empty error message once
+// cost a debugging session, so never throw a bare status code again.
+function describeFailure(status: number, raw: string, parsed: unknown): string {
+  const message = errorMessage(parsed);
+  if (message) return message;
+
+  const snippet = raw.trim().slice(0, 300);
+  return snippet ? `HTTP ${status}: ${snippet}` : `HTTP ${status}`;
 }
 
 function tryParse<T>(text: string): T | null {
@@ -257,35 +280,47 @@ async function callOnce<T>(
 
   let response = await send(!JSON_MODE_DISABLED);
 
-  // A few models accept the request but reject the JSON-mode flag. If that is
-  // the only complaint, try once more without it before abandoning this model.
+  // Some models accept the request but reject the JSON-mode flag. Providers
+  // report that in wildly different ways, and some return an error body we
+  // cannot read at all, so do not depend on matching the wording: on any 400 or
+  // 422, simply try once more without JSON mode before abandoning this model.
+  // The cost is one extra request in a case that was already failing.
   if (
     !response.ok &&
     !JSON_MODE_DISABLED &&
     (response.status === 400 || response.status === 422)
   ) {
-    const peek = await response.clone().json().catch(() => null);
-    if (/response_format|json/i.test(errorMessage(peek))) {
-      response = await send(false);
-    }
+    response = await send(false);
   }
 
-  const body = await response.json().catch(() => null);
+  const raw = await response.text();
+  const body = tryParse<Record<string, unknown>>(raw);
 
   if (!response.ok) {
+    // AssemblyAI's gateway returns a request_id on every response. Carry it into
+    // the error so a support ticket can point at the exact call.
+    const requestId =
+      body && typeof body.request_id === "string" ? ` [request_id ${body.request_id}]` : "";
     throw new Error(
-      errorMessage(body) || `${provider.name} returned ${response.status}`
+      `${provider.name} ${describeFailure(response.status, raw, body)}${requestId}`
     );
   }
 
-  const content: string = body?.choices?.[0]?.message?.content ?? "";
+  const parsedBody = body as
+    | {
+        choices?: Array<{ message?: { content?: string } }>;
+        usage?: Record<string, number>;
+      }
+    | null;
+
+  const content: string = parsedBody?.choices?.[0]?.message?.content ?? "";
 
   const usage: ChatUsage = {
     inputTokens: Number(
-      body?.usage?.prompt_tokens ?? body?.usage?.input_tokens ?? 0
+      parsedBody?.usage?.prompt_tokens ?? parsedBody?.usage?.input_tokens ?? 0
     ),
     outputTokens: Number(
-      body?.usage?.completion_tokens ?? body?.usage?.output_tokens ?? 0
+      parsedBody?.usage?.completion_tokens ?? parsedBody?.usage?.output_tokens ?? 0
     ),
   };
 
